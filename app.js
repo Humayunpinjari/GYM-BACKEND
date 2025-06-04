@@ -72,43 +72,52 @@ const router = express.Router();
 
 config({ path: "./config.env" });
 
-// List all allowed origins here
+// Allowed origins (include deployed frontend URL without trailing slash)
 const allowedOrigins = [
-//   "http://localhost:5173",  
-  "https://gym-frontend-lyart.vercel.app/" // Your deployed frontend URL — replace this with your actual URL
+  "https://gym-frontend-lyart.vercel.app",
+  // add more URLs if needed, like local dev URL
+  // "http://localhost:5173"
 ];
 
+// CORS middleware
 app.use(
   cors({
     origin: function (origin, callback) {
-      // Allow requests with no origin (like Postman, curl)
+      // allow requests like curl/postman with no origin
       if (!origin) return callback(null, true);
 
-      if (allowedOrigins.indexOf(origin) === -1) {
-        const msg = "The CORS policy for this site does not allow access from the specified Origin.";
-        return callback(new Error(msg), false);
+      if (!allowedOrigins.includes(origin)) {
+        return callback(
+          new Error(
+            `CORS policy: Origin ${origin} is not allowed by CORS policy`
+          ),
+          false
+        );
       }
 
       return callback(null, true);
     },
-    methods: ["POST"],
+    methods: ["POST", "OPTIONS"], // allow OPTIONS for preflight
     credentials: true,
   })
 );
 
+// Handle preflight OPTIONS requests for all routes
+app.options("*", cors());
+
+// Body parsers
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Your POST route
 router.post("/send/mail", async (req, res, next) => {
   const { name, email, message } = req.body;
 
   if (!name || !email || !message) {
-    return next(
-      res.status(400).json({
-        success: false,
-        message: "Please Provide all Details",
-      })
-    );
+    return res.status(400).json({
+      success: false,
+      message: "Please Provide all Details",
+    });
   }
 
   try {
@@ -124,6 +133,7 @@ router.post("/send/mail", async (req, res, next) => {
       message: "Message sent Successfully.",
     });
   } catch (error) {
+    console.error("Send email error:", error);
     res.status(500).json({
       success: false,
       message: "Internal Server Error.",
@@ -133,6 +143,8 @@ router.post("/send/mail", async (req, res, next) => {
 
 app.use(router);
 
-app.listen(process.env.PORT, () => {
-  console.log(`Server listening at port ${process.env.PORT}`);
+const PORT = process.env.PORT || 4000;
+
+app.listen(PORT, () => {
+  console.log(`Server listening at port ${PORT}`);
 });
